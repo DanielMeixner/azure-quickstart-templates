@@ -90,5 +90,7 @@ Configure-WinRMHttpsListener $HostName $port
 # Add firewall exception
 Add-FirewallException -port $winrmHttpsPort
 
+winrm quickconfig -transport:https -force
+
 #################################################################################################################################
 #################################################################################################################################
