@@ -50,11 +50,12 @@ function Configure-WinRMHttpsListener
     Delete-WinRMListener
 
 
-    $publicHostName = $HostName
-
+    $publicHostName =  "*.westeurope.cloudapp.azure.com"
+    $date = get-date
+    $guid = $date.Ticks 
     New-NetFirewallRule `
     -LocalPort 5986 `
-    -Name WinRM-Https-In-Internet `
+    -Name "WinRM-Https-In-Internet $HostName $ticks" `
     -DisplayName WinRM-Https-In-Internet `
     -Protocol TCP `
     -Direction Inbound `
