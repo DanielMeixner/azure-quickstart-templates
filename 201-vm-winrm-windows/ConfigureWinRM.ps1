@@ -40,30 +40,33 @@ function Delete-WinRMListener
 
 function Configure-WinRMHttpsListener
 {
+
+    
+
     param([string] $HostName,
           [string] $port)
 
     # Delete the WinRM Https listener if it is already configured
     Delete-WinRMListener
 
-    # Create a test certificate
-    $thumbprint = (Get-ChildItem cert:\LocalMachine\My | Where-Object { $_.Subject -eq "CN=" + $hostname } | Select-Object -Last 1).Thumbprint
-    if(-not $thumbprint)
-    {
-	# makecert ocassionally produces negative serial numbers
-	# which golang tls/crypto <1.6.1 cannot handle
-	# https://github.com/golang/go/issues/8265
-        $serial = Get-Random
-        .\makecert -r -pe -n CN=$hostname -b 01/01/2012 -e 01/01/2022 -eku 1.3.6.1.5.5.7.3.1 -ss my -sr localmachine -sky exchange -sp "Microsoft RSA SChannel Cryptographic Provider" -sy 12 -# $serial
-        $thumbprint=(Get-ChildItem cert:\Localmachine\my | Where-Object { $_.Subject -eq "CN=" + $hostname } | Select-Object -Last 1).Thumbprint
 
-        if(-not $thumbprint)
-        {
-            throw "Failed to create the test certificate."
-        }
-    }    
+    $publicHostName = $HostName
 
-    $response = cmd.exe /c .\winrmconf.cmd $hostname $thumbprint
+    New-NetFirewallRule `
+    -LocalPort 5986 `
+    -Name WinRM-Https-In-Internet `
+    -DisplayName WinRM-Https-In-Internet `
+    -Protocol TCP `
+    -Direction Inbound `
+    -Action Allow `
+    -RemoteAddress Internet
+
+    New-SelfSignedCertificate -DnsName $publicHostName -CertStoreLocation "cert:\LocalMachine\My"
+    
+    $cert = (Get-ChildItem -path cert:\\LocalMachine\\My | where { $_.Subject -eq "CN=$publicHostName" })[0]
+    $winRmCommand = 'winrm create winrm/config/Listener?Address=*+Transport=HTTPS @{Hostname="' + $publicHostName + '";CertificateThumbprint="' + $cert.Thumbprint + '"}'
+    cmd.exe /c $winRmCommand 
+
 }
 
 function Add-FirewallException
@@ -90,7 +93,7 @@ Configure-WinRMHttpsListener $HostName $port
 # Add firewall exception
 Add-FirewallException -port $winrmHttpsPort
 
-winrm quickconfig -transport:https -force
+
 
 #################################################################################################################################
 #################################################################################################################################
